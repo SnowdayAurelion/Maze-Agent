@@ -141,17 +141,35 @@ class Environment:
         
         print(piece_state,"\n\n\n\n")
         
+        # Checks validity of pieces using rulebook
         for i in range(len(piece_state)-1):
             for j in range(1,len(piece_state[0])):
                 piece_Q=check(piece_state[i][j],piece_state[i+1][j-1])
                 piece_state[i+1][j]=piece_Q
         print(piece_state)
-        sys.exit()
-        for i in range(len(state)):
-            for j in range(len(state[0])):
-                pass
         
+        pieces={0:piece0,1:piece1,2:piece2,3:piece3,4:piece4,5:piece5,6:piece6,7:piece7}
+        for i in range(len(piece_state)-2):
+            # Off set i
+            if i!=0:
+                i+=2
+            for j in range(len(piece_state[0])-2):
+                # Get the piece
+                piece=pieces[piece_state[i][j]]
+                print(piece_state[i][j])
+                
+                # Off set j
+                if i!=0:
+                    j+=2
+                
+                # Replace values in state with values of the piece
+                state[i][j]=piece[0][0]
+                state[i+1][j]=piece[1][0]
+                state[i][j+1]=piece[0][1]
+                state[i+1][j+1]=piece[1][1]
+                 
         print(state)
+        sys.exit()
         pass
     def percept(self,state,position=None):  #percept to give to agent #Might use just to initialize the agent
         #If position=None, find first mini agent
