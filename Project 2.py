@@ -10,6 +10,8 @@ import numpy as np
 import copy
 import sys
 import random
+import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
 
 #Example data
 initial_state = [
@@ -70,7 +72,8 @@ class Agent:
     
 class Environment:
     def __init__(self,initial_state=None,agent_name="Pathfinder"):
-        self.generate()
+        state=self.generate()   
+        self.visualize(state)
         sys.exit()
         #Generate initial state if not given
         if initial_state==None:
@@ -108,51 +111,239 @@ class Environment:
         # print(self.data)
         
     def generate(self):
-        #Create 16x16 state with just walls
+        # Create 16x16 state with just walls
         state=[[0 for i in range(16)] for i in range(16)]
-        piece0=[[0,0],
-                [0,0]]
-        piece1=[[1,0],
-                [0,0]]
-        piece2=[[0,1],
-                [0,0]]        
-        piece3=[[0,0],
-                [1,0]]
-        piece4=[[0,0],
-                [0,1]]
-        piece5=[[0,1],
-                [0,1]]
-        piece6=[[0,0],
-                [1,1]]
-        piece7=[[1,1],
-                [1,1]]
         
-        rulebook={0:[0,1,2,3,4,5,6,7],1:[1,2,3,4,5,6],2:[1,2,4,5],3:[1,3,4,6],4:[2,3,4,5,6],5:[],6:[],7:[]}
-        def check(piece_A,piece_B):
-            pieces=list(np.intersect1d(rulebook[piece_A],rulebook[piece_B]))
-            if pieces:
-                return random.choice(pieces)
-            else:
-                return 0
-        # print(check(1,2)) #should be 1 and 3
+        # Create functions that chooses the piece variation
+        def choose_piece1():
+            
+            options = [[[0, 1, 0, 0, 0, 1, 0, 0],
+                       [0, 1, 1, 1, 0, 1, 1, 0],
+                        [0, 0, 0, 0, 0, 0, 0, 0],
+                        [1, 0, 1, 1, 0, 1, 1, 0],
+                        [1, 0, 0, 1, 0, 1, 1, 1],
+                        [1, 1, 0, 1, 0, 0, 0, 1],
+                        [0, 0, 0, 1, 1, 1, 0, 1],
+                        [1, 1, 0, 0, 1, 1, 0, 0]],
+
+                       [[0, 0, 0, 1, 1, 0, 1, 1],
+                        [1, 1, 0, 1, 0, 0, 0, 1],
+                        [0, 0, 0, 1, 0, 1, 0, 1],
+                        [1, 0, 1, 0, 0, 1, 0, 0],
+                        [1, 0, 0, 0, 1, 0, 0, 1],
+                        [0, 1, 1, 1, 1, 0, 1, 1],
+                        [0, 0, 0, 0, 0, 0, 1, 1],
+                        [1, 1, 1, 0, 1, 1, 1, 1]],
+
+                       [[0, 1, 1, 1, 1, 1, 1, 1],
+                        [0, 0, 1, 0, 0, 0, 0, 0],
+                        [1, 0, 0, 1, 1, 0, 1, 1],
+                        [1, 0, 0, 0, 1, 0, 0, 0],
+                        [1, 0, 1, 0, 0, 1, 0, 1],
+                        [1, 0, 1, 0, 0, 0, 0, 0],
+                        [0, 0, 1, 0, 1, 0, 1, 0],
+                        [0, 1, 1, 0, 1, 1, 1, 0]],
+
+                       [[0, 0, 0, 0, 1, 1, 1, 0],
+                        [1, 1, 1, 0, 1, 0, 0, 0],
+                        [1, 1, 1, 0, 1, 1, 0, 1],
+                        [1, 0, 1, 0, 0, 0, 0, 0],
+                        [1, 0, 0, 0, 1, 1, 0, 1],
+                        [0, 0, 1, 0, 1, 1, 0, 1],
+                        [0, 1, 1, 0, 0, 0, 0, 1],
+                        [0, 0, 1, 0, 1, 1, 1, 1]],
+
+                       [[0, 0, 1, 0, 0, 0, 0, 1],
+                        [1, 0, 1, 0, 1, 1, 0, 1],
+                        [0, 0, 0, 0, 0, 1, 0, 1],
+                        [1, 1, 0, 1, 0, 1, 0, 0],
+                        [0, 0, 0, 1, 0, 1, 0, 1],
+                        [0, 1, 0, 0, 0, 1, 0, 1],
+                        [0, 1, 1, 1, 1, 1, 0, 1],
+                        [0, 0, 0, 0, 1, 1, 0, 0]]]
+            
+            return options[random.randint(0,len(options)-1)]
         
-        piece_state=[[random.randint(1, 7) for i in range(8)] for i in range(8)]
-        # piece_state=[[7, 1, 7, 7, 7, 7, 7, 7], [2, 7, 7, 7, 7, 7, 7, 7], [7, 7, 7, 7, 7, 7, 7, 7], [7, 7, 7, 7, 7, 7, 7, 7], [7, 7, 7, 7, 7, 7, 7, 7], [7, 7, 7, 7, 7, 7, 7, 7], [7, 7, 7, 7, 7, 7, 7, 7], [7, 7, 7, 7, 7, 7, 7, 7]] 
+        def choose_piece2():
+            
+            options = [[[1, 0, 1, 1, 1, 1, 1, 1],
+                       [1, 0, 0, 0, 0, 0, 1, 1],
+                        [1, 0, 1, 1, 1, 0, 0, 1],
+                        [0, 0, 1, 0, 1, 1, 0, 1],
+                        [1, 0, 1, 0, 0, 1, 0, 1],
+                        [1, 0, 0, 0, 1, 1, 0, 1],
+                        [0, 0, 1, 1, 0, 0, 0, 1],
+                        [1, 1, 1, 1, 0, 1, 1, 1]],
+
+                       [[1, 1, 1, 0, 0, 0, 1, 1],
+                        [1, 0, 1, 0, 1, 0, 1, 1],
+                        [1, 0, 1, 0, 1, 0, 0, 1],
+                        [0, 0, 1, 0, 1, 1, 0, 1],
+                        [1, 0, 1, 0, 0, 1, 0, 0],
+                        [1, 0, 0, 0, 1, 0, 0, 1],
+                        [1, 0, 1, 1, 0, 0, 1, 1],
+                        [1, 0, 1, 1, 0, 1, 1, 1]],
+
+                       [[1, 1, 1, 1, 0, 1, 1, 1],
+                        [1, 1, 0, 0, 0, 0, 0, 1],
+                        [1, 1, 0, 1, 0, 1, 0, 1],
+                        [0, 0, 0, 0, 0, 0, 0, 0],
+                        [1, 1, 0, 1, 0, 1, 0, 1],
+                        [1, 1, 0, 0, 0, 0, 0, 1],
+                        [1, 1, 1, 1, 0, 1, 1, 1],
+                        [1, 1, 1, 1, 0, 1, 1, 1]],
+
+                       [[0, 0, 0, 0, 0, 0, 1, 0],
+                        [1, 0, 1, 1, 1, 0, 1, 0],
+                        [1, 0, 1, 0, 1, 0, 0, 0],
+                        [0, 0, 1, 0, 1, 1, 0, 1],
+                        [1, 0, 0, 0, 1, 1, 0, 1],
+                        [1, 0, 1, 1, 0, 0, 0, 0],
+                        [0, 0, 1, 1, 0, 1, 1, 1],
+                        [0, 1, 1, 1, 0, 1, 1, 1]],
+
+                       [[1, 1, 1, 1, 1, 1, 0, 1],
+                        [1, 1, 0, 0, 0, 0, 0, 1],
+                        [1, 1, 0, 1, 0, 1, 1, 1],
+                        [0, 0, 0, 1, 0, 0, 0, 0],
+                        [1, 1, 0, 1, 1, 1, 1, 0],
+                        [1, 1, 0, 1, 0, 0, 0, 0],
+                        [1, 0, 0, 1, 0, 1, 0, 1],
+                        [1, 1, 1, 1, 0, 1, 1, 1]]]
+            
+            return options[random.randint(0,len(options)-1)]
         
-        print(piece_state,"\n\n\n\n")
+        def choose_piece3():
+            
+            options = [[[1, 1, 1, 0, 1, 1, 1, 1],
+                       [0, 0, 0, 0, 0, 0, 0, 1],
+                        [0, 1, 0, 1, 1, 1, 0, 1],
+                        [0, 0, 1, 0, 0, 0, 0, 1],
+                        [1, 0, 1, 0, 1, 1, 0, 0],
+                        [1, 0, 1, 0, 1, 0, 0, 1],
+                        [1, 0, 0, 1, 0, 0, 1, 1],
+                        [1, 1, 0, 0, 0, 1, 1, 1]],
+
+                       [[1, 1, 1, 0, 1, 1, 1, 0],
+                        [0, 0, 1, 0, 0, 0, 0, 0],
+                        [1, 0, 1, 1, 1, 0, 1, 1],
+                        [1, 0, 0, 0, 0, 0, 1, 1],
+                        [1, 0, 1, 1, 1, 1, 1, 0],
+                        [1, 0, 0, 0, 0, 0, 0, 0],
+                        [1, 0, 1, 1, 1, 1, 1, 1],
+                        [1, 0, 0, 0, 0, 0, 1, 1]],
+
+                       [[1, 1, 1, 0, 1, 1, 1, 1],
+                        [1, 0, 1, 0, 1, 0, 0, 1],
+                        [0, 0, 1, 0, 0, 0, 1, 1],
+                        [1, 0, 1, 1, 1, 0, 1, 1],
+                        [1, 0, 0, 0, 0, 0, 0, 0],
+                        [1, 0, 1, 1, 0, 1, 1, 1],
+                        [1, 0, 1, 1, 0, 1, 1, 1],
+                        [0, 0, 1, 1, 0, 0, 0, 1]],
+
+                       [[0, 1, 1, 0, 1, 1, 1, 0],
+                        [0, 0, 0, 0, 1, 0, 1, 0],
+                        [1, 1, 0, 0, 1, 0, 0, 0],
+                        [0, 0, 0, 1, 1, 0, 1, 1],
+                        [1, 1, 0, 1, 1, 0, 1, 0],
+                        [0, 0, 0, 0, 0, 0, 1, 0],
+                        [1, 0, 1, 0, 1, 0, 0, 0],
+                        [1, 0, 1, 0, 1, 0, 1, 1]],
+
+                       [[1, 1, 1, 0, 1, 1, 1, 1],
+                        [1, 1, 1, 0, 0, 0, 0, 1],
+                        [0, 0, 0, 0, 1, 1, 0, 1],
+                        [0, 1, 1, 1, 1, 1, 1, 1],
+                        [0, 1, 0, 0, 0, 1, 0, 0],
+                        [0, 1, 0, 1, 0, 1, 0, 1],
+                        [0, 0, 0, 1, 0, 0, 0, 1],
+                        [1, 0, 1, 1, 1, 0, 1, 1]]]
+
+            return options[random.randint(0,len(options)-1)]
+    
+        def choose_piece4():
+            
+            options = [[[1, 0, 0, 0, 0, 1, 1, 1],
+                       [1, 0, 1, 1, 0, 0, 0, 1],
+                        [1, 0, 0, 1, 1, 1, 0, 1],
+                        [1, 1, 0, 1, 0, 0, 0, 1],
+                        [0, 0, 0, 1, 1, 1, 0, 0],
+                        [1, 0, 1, 1, 0, 1, 1, 0],
+                        [1, 0, 0, 0, 0, 1, 0, 0],
+                        [1, 1, 1, 1, 1, 3, 0, 1]],
+
+                       [[0, 0, 1, 1, 0, 1, 1, 1],
+                        [1, 0, 1, 0, 0, 1, 1, 1],
+                        [1, 0, 1, 0, 1, 1, 0, 1],
+                        [1, 0, 1, 0, 0, 0, 0, 1],
+                        [0, 0, 1, 1, 1, 1, 0, 1],
+                        [1, 0, 1, 3, 1, 1, 0, 1],
+                        [1, 0, 1, 0, 0, 0, 0, 1],
+                        [1, 0, 0, 0, 1, 1, 0, 1]],
+
+                       [[1, 1, 1, 1, 0, 1, 1, 1],
+                        [1, 0, 0, 0, 0, 0, 1, 1],
+                        [1, 0, 1, 1, 0, 1, 1, 1],
+                        [1, 0, 1, 1, 1, 1, 1, 0],
+                        [0, 0, 0, 1, 3, 0, 0, 0],
+                        [1, 0, 1, 1, 1, 1, 1, 0],
+                        [1, 0, 1, 1, 0, 1, 1, 0],
+                        [1, 0, 0, 0, 0, 0, 0, 0]],
+
+                       [[1, 0, 1, 1, 0, 1, 0, 1],
+                        [1, 0, 1, 1, 0, 1, 0, 1],
+                        [0, 0, 0, 0, 0, 0, 0, 0],
+                        [1, 0, 1, 1, 0, 1, 1, 1],
+                        [0, 0, 1, 1, 0, 1, 0, 1],
+                        [1, 0, 1, 0, 0, 0, 0, 1],
+                        [1, 0, 1, 1, 0, 1, 0, 0],
+                        [0, 0, 0, 0, 0, 0, 1, 3]],
+
+                       [[3, 0, 1, 1, 0, 1, 1, 1],
+                        [1, 0, 0, 1, 0, 0, 0, 1],
+                        [1, 1, 0, 1, 1, 1, 0, 1],
+                        [1, 1, 0, 1, 1, 1, 0, 1],
+                        [0, 0, 0, 0, 0, 0, 0, 0],
+                        [1, 1, 0, 1, 0, 1, 0, 1],
+                        [1, 0, 0, 1, 0, 1, 0, 1],
+                        [1, 0, 1, 1, 0, 0, 0, 1]]]
+            
+            return options[random.randint(0,len(options)-1)]
         
-        for i in range(len(piece_state)-1):
-            for j in range(1,len(piece_state[0])):
-                piece_Q=check(piece_state[i][j],piece_state[i+1][j-1])
-                piece_state[i+1][j]=piece_Q
-        print(piece_state)
-        sys.exit()
+        # Dictionary of pieces we are using
+        pieces={1:choose_piece1(),2:choose_piece2(),3:choose_piece3(),4:choose_piece4()}
+        
+        # Place pieces in state
+        
+        ## Intiate pieces
+        piece1=pieces[1]
+        piece2=pieces[2]
+        piece3=pieces[3]
+        piece4=pieces[4]
+        
+        ## Insert pieces in state
         for i in range(len(state)):
             for j in range(len(state[0])):
-                pass
+                
+                # if in Piece 1's range
+                if i<=7 and j<=7:
+                    state[i][j]=piece1[i%8][j%8]
+                
+                # if in Piece 2's range
+                if i<=7 and 7<j:
+                    state[i][j]=piece2[i%8][j%8]
+                
+                # if in Piece 3's range
+                if 7<i and j<=7:
+                    state[i][j]=piece3[i%8][j%8]
+                    
+                # if in Piece4's range
+                if 7<i and 7<j:
+                    state[i][j]=piece4[i%8][j%8]
         
-        print(state)
-        pass
+        # print(state)
+        return state
     def percept(self,state,position=None):  #percept to give to agent #Might use just to initialize the agent
         #If position=None, find first mini agent
         if position==None:
@@ -202,8 +393,6 @@ class Environment:
     
     def update(self,action):
         pass
-    def valid_map(self,state):
-        return True
     
     def find_positions(self,state,first=False):
         positions=[]
@@ -218,6 +407,19 @@ class Environment:
                     return [i,j]
             
         return positions
+    
+    def visualize(self,state):
+        # Custom color map
+        cmap=ListedColormap(["#ffffff","#666666","#3d85c6","#fbbc04"])
+        
+        # Create plot
+        fig,ax=plt.subplots()
+        ax.matshow(state,cmap=cmap)
+        ax.axis("off")
+        
+        # Show plot
+        fig.show()
+        
+        return None
 
 environment=Environment(initial_state)
-
