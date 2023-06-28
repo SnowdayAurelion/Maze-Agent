@@ -73,7 +73,7 @@ class Agent:
 class Environment:
     def __init__(self,initial_state=None,agent_name="Pathfinder"):
         state=self.generate()   
-        self.visualize(state)
+        self.transition_model("S",state)
         sys.exit()
         #Generate initial state if not given
         if initial_state==None:
@@ -387,11 +387,16 @@ class Environment:
         except IndexError:
             percept+="1"
         
-        print(percept)
+        # print(percept)
         
         return percept
     
-    def update(self,action):
+    def update(self,action,state):
+        #Testing with 2 in state
+        state[0][0]=2
+        
+        
+        
         pass
     
     def find_positions(self,state,first=False):
@@ -401,7 +406,7 @@ class Environment:
         for i in range(len(state)):
             for j in range(len(state[0])):
                 if state[i][j]==2:
-                    positions.append([[i,j]])
+                    positions.append([i,j])
                 #If first is True, find the first instantce of mini agent
                 if state[i][j]==2 and first==True:
                     return [i,j]
@@ -421,5 +426,53 @@ class Environment:
         fig.show()
         
         return None
+    
+    def transition_model(self,action,state):
+        # Testing zone
+        # state[random.randint(0,15)][random.randint(0,15)]=2
+        # state[random.randint(0,15)][random.randint(0,15)]=2
+        # state[random.randint(0,15)][random.randint(0,15)]=2
+        # self.visualize(state)
+        
+        # Get positions
+        positions=self.find_positions(state)
+        
+        # Initate results
+        result=[]
+        
+        for position in positions:
+            # Find percept
+            percept=self.percept(state,position)
 
+            # If North
+            if action=="N":
+                # Check for a wall
+                if percept[0] in "12":
+                    # False if there's a wall
+                    result.append(False)
+                else:
+                    result.append(True)
+                    
+            # If East
+            if action=="E":
+                if percept[1] in "12":
+                    result.append(False)
+                else:
+                    result.append(True)
+                    
+            # If West
+            if action=="W":
+                if percept[2] in "12":
+                    result.append(False)
+                else:
+                    result.append(True)
+                    
+            # if South
+            if action=="S":
+                if percept[3] in "12":
+                    result.append(False)
+                else:
+                    result.append(True)
+   
+        return result
 environment=Environment(initial_state)
