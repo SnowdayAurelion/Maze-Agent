@@ -72,43 +72,51 @@ class Agent:
     
 class Environment:
     def __init__(self,initial_state=None,agent_name="Pathfinder"):
-        state=self.generate()   
-        self.transition_model("S",state)
-        sys.exit()
-        #Generate initial state if not given
-        if initial_state==None:
-            initial_state=self.generate()
-        else:
-            #If given, then check if it's valid
-            if self.valid_map(initial_state):
-                pass
-            else:
-                raise(Exception("Invalid map"))
+        # Initiate variables
+        self.agent_name=agent_name
+        self.initial_state=initial_state
+        self.state=initial_state
+        self.goal=None
+
+        # Generate initial state if not given, and save to self.initial_state and self.state
+        if self.initial_state==None:
+            self.initial_state=self.generate()
+            self.state=self.initial_state
         
-        #Find positon of mini agent (there will be one)
-        position=self.find_positions(initial_state,True)
+        # Find goal for self.goal
+        for i in range(len(self.initial_state)):
+            for j in range(len(self.initial_state[0])):
+                if self.initial_state[i][j]==3:
+                    self.goal=[i,j]
         
-        #Make sure agent does not know it's position
-        initial_state_clueless=copy.deepcopy(initial_state)
+        # Place Agent in map
+        self.initial_state=self.place_agent(self.initial_state)
+        self.state=self.initial_state
+        self.visualize(self.initial_state)
+        
+        # Find positon of Agent
+        position=self.find_positions(self.initial_state,True)
+        
+        # Make sure agent does not know it's position
+        initial_state_clueless=copy.deepcopy(self.initial_state)
         for i in range(len(initial_state_clueless)):
             for j in range(len(initial_state_clueless)):
                 if initial_state_clueless[i][j]==2:
                     initial_state_clueless[i][j]=0
         
-        print(initial_state)
-        #Get percept for Agent
-        percept=self.percept(initial_state,position)
+        # Get percept for Agent
+        percept=self.percept(self.initial_state,position)
         
-        #Give percept to Agent
-        self.Agent=Agent(agent_name,initial_state_clueless,percept)
+        # Create Agent, and give data (state and percept)
+        self.Agent=Agent(self.agent_name,initial_state_clueless,percept)
+        
         print(self.Agent.data)
-        # print(self.Agent.data)
+
         #Save data in DataFrame
-        self.data=pd.DataFrame(columns=["Initial state","State","Percept"])
-        self.data["Initial state"]=initial_state
-        self.data["State"]=initial_state
-        self.data["Percept"]=percept
-        # print(self.data)
+        # self.data=pd.DataFrame(columns=["Initial state","State","Percept"])
+        # self.data["Initial state"]=initial_state
+        # self.data["State"]=initial_state
+        # self.data["Percept"]=percept
         
     def generate(self):
         # Create 16x16 state with just walls
@@ -353,7 +361,7 @@ class Environment:
         percept=""
         
         #Calculate N, E, W, and S
-        print(position)
+        
         #N
         try:
             if position[0]!=0:
@@ -392,12 +400,45 @@ class Environment:
         return percept
     
     def update(self,action,state):
-        #Testing with 2 in state
-        state[0][0]=2
+        # Initate indicator that says if Agent moved
+        moved=False
         
+        # Get position of Agent
+        i=self.find_positions(state,True)[0]
+        j=self.find_positions(state,True)[1]
         
+        # If action is North, verify with transition model
+        if action=="N" and self.transition_model("N",state)[0]:
+            
+            # Place Agent one step North
+            state[i-1][j]=2
+            
+            # Say Agent moved
+            moved=True
+            
+        # If action is East
+        if action=="E" and self.transition_model("E",state)[0]:
+            state[i][j+1]=2
+            moved=True
+            
+        # If action is West
+        if action=="W" and self.transition_model("W",state)[0]:
+            state[i][j-1]=2
+            moved=True
+
+        # If action is South
+        if action=="S" and self.transition_model("S",state)[0]:
+            state[i+1][j]=2
+            moved=True
+            
+        # Set old position as 0 if Agent moved
+        if moved:
+            state[i][j]=0
         
-        pass
+        if self.goal_test(state):
+            print("The Agent has reached the goal!")
+        
+        return state
     
     def find_positions(self,state,first=False):
         positions=[]
@@ -473,6 +514,25 @@ class Environment:
                     result.append(False)
                 else:
                     result.append(True)
-   
+                    
+        # print(result)
         return result
-environment=Environment(initial_state)
+    
+    def goal_test(self,state):
+        # If the position of the agent is same as goal return True
+        if self.find_positions(state,True)==self.goal:
+            return True
+        else:
+            return False
+        
+    def place_agent(self,state):
+        while True:
+            i=random.randint(0,7)
+            j=random.randint(0,7)
+            
+            # If there is a free space, place the agent
+            if state[i][j]==0:
+                state[i][j]=2
+                return state
+
+environment=Environment()
