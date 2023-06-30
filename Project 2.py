@@ -12,6 +12,7 @@ import sys
 import random
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
+import time
 
 #Example data
 initial_state = [
@@ -71,31 +72,40 @@ class Agent:
         pass
     
 class Environment:
-    def __init__(self,initial_state=None,agent_name="Pathfinder"):
+    def __init__(self,initial_state=None,agent_name="Pathfinder",difficulty="M"):
         # Initiate variables
         self.agent_name=agent_name
         self.initial_state=initial_state
         self.state=initial_state
         self.goal=None
 
-        # Generate initial state if not given, and save to self.initial_state and self.state
+        # Generate initial state if not given
         if self.initial_state==None:
             self.initial_state=self.generate()
-            self.state=self.initial_state
         
-        # Find goal for self.goal
-        for i in range(len(self.initial_state)):
-            for j in range(len(self.initial_state[0])):
-                if self.initial_state[i][j]==3:
-                    self.goal=[i,j]
+        # Set difficulty parameters
+        ## If set to easy
+        if difficulty=="E":
+            min_dist=5
+            max_dist=9
+        ## If set to medium    
+        if difficulty=="M":
+            min_dist=17
+            max_dist=20
+            
+        ## If set to hard
+        if difficulty=="H":
+            min_dist=18
+            max_dist=30
         
-        # Place Agent in map
-        self.initial_state=self.place_agent(self.initial_state)
+        # Place Agent and Goal in map, and save to self.initial_state and self.state
+        self.initial_state=self.place_agent_and_goal(self.initial_state,min_dist,max_dist)
         self.state=self.initial_state
-        self.visualize(self.initial_state)
+        self.visualize(self.state)
         
-        # Find positon of Agent
+        # Find positon of Agent and Goal
         position=self.find_positions(self.initial_state,True)
+        self.goal=self.find_positions(self.initial_state,True,True)
         
         # Make sure agent does not know it's position
         initial_state_clueless=copy.deepcopy(self.initial_state)
@@ -279,14 +289,14 @@ class Environment:
                         [0, 0, 0, 1, 1, 1, 0, 0],
                         [1, 0, 1, 1, 0, 1, 1, 0],
                         [1, 0, 0, 0, 0, 1, 0, 0],
-                        [1, 1, 1, 1, 1, 3, 0, 1]],
+                        [1, 1, 1, 1, 1, 0, 0, 1]],
 
                        [[0, 0, 1, 1, 0, 1, 1, 1],
                         [1, 0, 1, 0, 0, 1, 1, 1],
                         [1, 0, 1, 0, 1, 1, 0, 1],
                         [1, 0, 1, 0, 0, 0, 0, 1],
                         [0, 0, 1, 1, 1, 1, 0, 1],
-                        [1, 0, 1, 3, 1, 1, 0, 1],
+                        [1, 0, 1, 0, 1, 1, 0, 1],
                         [1, 0, 1, 0, 0, 0, 0, 1],
                         [1, 0, 0, 0, 1, 1, 0, 1]],
 
@@ -294,7 +304,7 @@ class Environment:
                         [1, 0, 0, 0, 0, 0, 1, 1],
                         [1, 0, 1, 1, 0, 1, 1, 1],
                         [1, 0, 1, 1, 1, 1, 1, 0],
-                        [0, 0, 0, 1, 3, 0, 0, 0],
+                        [0, 0, 0, 1, 0, 0, 0, 0],
                         [1, 0, 1, 1, 1, 1, 1, 0],
                         [1, 0, 1, 1, 0, 1, 1, 0],
                         [1, 0, 0, 0, 0, 0, 0, 0]],
@@ -306,9 +316,9 @@ class Environment:
                         [0, 0, 1, 1, 0, 1, 0, 1],
                         [1, 0, 1, 0, 0, 0, 0, 1],
                         [1, 0, 1, 1, 0, 1, 0, 0],
-                        [0, 0, 0, 0, 0, 0, 1, 3]],
+                        [0, 0, 0, 0, 0, 0, 1, 0]],
 
-                       [[3, 0, 1, 1, 0, 1, 1, 1],
+                       [[0, 0, 1, 1, 0, 1, 1, 1],
                         [1, 0, 0, 1, 0, 0, 0, 1],
                         [1, 1, 0, 1, 1, 1, 0, 1],
                         [1, 1, 0, 1, 1, 1, 0, 1],
@@ -440,16 +450,22 @@ class Environment:
         
         return state
     
-    def find_positions(self,state,first=False):
+    def find_positions(self,state,first=False,find_goal=False):
+        if find_goal:
+            piece_type=3
+        else:
+            piece_type=2
+        
         positions=[]
         
-        #Cycle through matrix
+        # Cycle through matrix
         for i in range(len(state)):
             for j in range(len(state[0])):
-                if state[i][j]==2:
+                if state[i][j]==piece_type:
                     positions.append([i,j])
-                #If first is True, find the first instantce of mini agent
-                if state[i][j]==2 and first==True:
+                    
+                # If first is True, find the first instantce of mini agent
+                if state[i][j]==piece_type and first==True:
                     return [i,j]
             
         return positions
@@ -527,12 +543,50 @@ class Environment:
         
     def place_agent(self,state):
         while True:
-            i=random.randint(0,7)
-            j=random.randint(0,7)
+            i=random.randint(0,15)
+            j=random.randint(0,15)
             
             # If there is a free space, place the agent
             if state[i][j]==0:
                 state[i][j]=2
                 return state
+            
+    def place_goal(self,state):
+        while True:
+            i=random.randint(0,15)
+            j=random.randint(0,15)
+            
+            # If there is a free space, place the goal
+            if state[i][j]==0:
+                state[i][j]=3
+                return state
+ 
+    def M_distance(self,position1,position2):
+        return abs(position1[0]-position2[0])+abs(position1[1]-position2[1])
+    
+    def place_agent_and_goal(self,state,min_dist=17,max_dist=20):  
+        # Save original state
+        original_state=state
+        i=0
 
+        while True:
+            # Reset the state on each loop
+            state=copy.deepcopy(original_state)
+            i+=1
+            print(i)
+            
+            # First place the agent
+            state=self.place_agent(state)
+            agent_position=self.find_positions(state,True)
+            
+            # Place goal
+            state=self.place_goal(state)
+            goal_position=self.find_positions(state,True,True)
+            
+            # self.visualize(state)
+            
+            # Check if Manhattan distance between them is far enough
+            if min_dist<self.M_distance(agent_position,goal_position)<max_dist:
+                return state
+            
 environment=Environment()
