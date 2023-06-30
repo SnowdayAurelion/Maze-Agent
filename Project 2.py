@@ -362,6 +362,7 @@ class Environment:
         
         # print(state)
         return state
+    
     def percept(self,state,position=None):  #percept to give to agent #Might use just to initialize the agent
         #If position=None, find first mini agent
         if position==None:
