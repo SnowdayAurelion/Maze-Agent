@@ -75,19 +75,20 @@ class Environment:
     def __init__(self,initial_state=None,agent_name="Pathfinder",difficulty="M"):
         # Initiate variables
         self.agent_name=agent_name
-        self.initial_state=initial_state
         self.state=initial_state
         self.goal=None
 
         # Generate initial state if not given
-        if self.initial_state==None:
-            self.initial_state=self.generate()
+        if self.state==None:
+            self.generate()
         
         # Set difficulty parameters
+        
         ## If set to easy
         if difficulty=="E":
             min_dist=5
             max_dist=9
+            
         ## If set to medium    
         if difficulty=="M":
             min_dist=17
@@ -95,27 +96,26 @@ class Environment:
             
         ## If set to hard
         if difficulty=="H":
-            min_dist=18
-            max_dist=30
+            min_dist=28
+            max_dist=31
         
-        # Place Agent and Goal in map, and save to self.initial_state and self.state
-        self.initial_state=self.place_agent_and_goal(self.initial_state,min_dist,max_dist)
-        self.state=self.initial_state
-        self.visualize(self.state)
+        # Place Agent and Goal in map
+        self.place_agent_and_goal(min_dist,max_dist)
+        self.visualize()    
         
         # Find positon of Agent and Goal
-        position=self.find_positions(self.initial_state,True)
-        self.goal=self.find_positions(self.initial_state,True,True)
+        position=self.find_positions(True)
+        self.goal=self.find_positions(True,True)
         
         # Make sure agent does not know it's position
-        initial_state_clueless=copy.deepcopy(self.initial_state)
+        initial_state_clueless=copy.deepcopy(self.state)
         for i in range(len(initial_state_clueless)):
             for j in range(len(initial_state_clueless)):
                 if initial_state_clueless[i][j]==2:
                     initial_state_clueless[i][j]=0
         
         # Get percept for Agent
-        percept=self.percept(self.initial_state,position)
+        percept=self.percept(position)
         
         # Create Agent, and give data (state and percept)
         self.Agent=Agent(self.agent_name,initial_state_clueless,percept)
@@ -361,12 +361,13 @@ class Environment:
                     state[i][j]=piece4[i%8][j%8]
         
         # print(state)
-        return state
+        self.state=state
+        return self.state
     
-    def percept(self,state,position=None):  #percept to give to agent #Might use just to initialize the agent
+    def percept(self,position=None):  #percept to give to agent #Might use just to initialize the agent
         #If position=None, find first mini agent
         if position==None:
-            position=self.find_positions(state,first=True)
+            position=self.find_positions(True)
         
         #Initialize percept
         percept=""
@@ -376,15 +377,15 @@ class Environment:
         #N
         try:
             if position[0]!=0:
-                percept+=str(state[position[0]-1][position[1]])
+                percept+=str(self.state[position[0]-1][position[1]])
             else:
                 percept+="1"
         except IndexError:
             percept+="1"
         #E
         try:
-            if position[1]!=len(state[0]):
-                percept+=str(state[position[0]][position[1]+1])
+            if position[1]!=len(self.state[0]):
+                percept+=str(self.state[position[0]][position[1]+1])
             else:
                 percept+="1"
         except IndexError:
@@ -392,15 +393,15 @@ class Environment:
         #W
         try:
             if position[1]!=0:
-                percept+=str(state[position[0]][position[1]-1])
+                percept+=str(self.state[position[0]][position[1]-1])
             else:
                 percept+="1"
         except IndexError:
             percept+="1"
         #S
         try:
-            if position[0]!=len(state):
-                percept+=str(state[position[0]+1][position[1]])
+            if position[0]!=len(self.state):
+                percept+=str(self.state[position[0]+1][position[1]])
             else:
                 percept+="1"
         except IndexError:
@@ -410,48 +411,48 @@ class Environment:
         
         return percept
     
-    def update(self,action,state):
+    def update(self,action):
         # Initate indicator that says if Agent moved
         moved=False
         
         # Get position of Agent
-        i=self.find_positions(state,True)[0]
-        j=self.find_positions(state,True)[1]
+        i=self.find_positions(True)[0]
+        j=self.find_positions(True)[1]
         
         # If action is North, verify with transition model
-        if action=="N" and self.transition_model("N",state)[0]:
+        if action=="N" and self.transition_model("N")[0]:
             
             # Place Agent one step North
-            state[i-1][j]=2
+            self.state[i-1][j]=2
             
             # Say Agent moved
             moved=True
             
         # If action is East
-        if action=="E" and self.transition_model("E",state)[0]:
-            state[i][j+1]=2
+        if action=="E" and self.transition_model("E")[0]:
+            self.state[i][j+1]=2
             moved=True
             
         # If action is West
-        if action=="W" and self.transition_model("W",state)[0]:
-            state[i][j-1]=2
+        if action=="W" and self.transition_model("W")[0]:
+            self.state[i][j-1]=2
             moved=True
 
         # If action is South
-        if action=="S" and self.transition_model("S",state)[0]:
-            state[i+1][j]=2
+        if action=="S" and self.transition_model("S")[0]:
+            self.state[i+1][j]=2
             moved=True
             
         # Set old position as 0 if Agent moved
         if moved:
-            state[i][j]=0
+            self.state[i][j]=0
         
-        if self.goal_test(state):
+        if self.goal_test():
             print("The Agent has reached the goal!")
         
-        return state
+        return self.state
     
-    def find_positions(self,state,first=False,find_goal=False):
+    def find_positions(self,first=False,find_goal=False):
         if find_goal:
             piece_type=3
         else:
@@ -460,24 +461,24 @@ class Environment:
         positions=[]
         
         # Cycle through matrix
-        for i in range(len(state)):
-            for j in range(len(state[0])):
-                if state[i][j]==piece_type:
+        for i in range(len(self.state)):
+            for j in range(len(self.state[0])):
+                if self.state[i][j]==piece_type:
                     positions.append([i,j])
                     
                 # If first is True, find the first instantce of mini agent
-                if state[i][j]==piece_type and first==True:
+                if self.state[i][j]==piece_type and first==True:
                     return [i,j]
             
         return positions
     
-    def visualize(self,state):
+    def visualize(self):
         # Custom color map
         cmap=ListedColormap(["#ffffff","#666666","#3d85c6","#fbbc04"])
         
         # Create plot
         fig,ax=plt.subplots()
-        ax.matshow(state,cmap=cmap)
+        ax.matshow(self.state,cmap=cmap)
         ax.axis("off")
         
         # Show plot
@@ -485,27 +486,27 @@ class Environment:
         
         return None
     
-    def transition_model(self,action,state):
+    def transition_model(self,action):
         # Testing zone
         # state[random.randint(0,15)][random.randint(0,15)]=2
         # state[random.randint(0,15)][random.randint(0,15)]=2
         # state[random.randint(0,15)][random.randint(0,15)]=2
-        # self.visualize(state)
+        # self.visualize()
         
         # Get positions
-        positions=self.find_positions(state)
+        positions=self.find_positions()
         
         # Initate results
         result=[]
         
         for position in positions:
             # Find percept
-            percept=self.percept(state,position)
+            percept=self.percept(position)
 
             # If North
             if action=="N":
                 # Check for a wall
-                if percept[0] in "12":
+                if percept[0] in "1":
                     # False if there's a wall
                     result.append(False)
                 else:
@@ -513,21 +514,21 @@ class Environment:
                     
             # If East
             if action=="E":
-                if percept[1] in "12":
+                if percept[1] in "1":
                     result.append(False)
                 else:
                     result.append(True)
                     
             # If West
             if action=="W":
-                if percept[2] in "12":
+                if percept[2] in "1":
                     result.append(False)
                 else:
                     result.append(True)
                     
             # if South
             if action=="S":
-                if percept[3] in "12":
+                if percept[3] in "1":
                     result.append(False)
                 else:
                     result.append(True)
@@ -535,59 +536,54 @@ class Environment:
         # print(result)
         return result
     
-    def goal_test(self,state):
+    def goal_test(self):
         # If the position of the agent is same as goal return True
-        if self.find_positions(state,True)==self.goal:
+        if self.find_positions(True)==self.goal:
             return True
         else:
             return False
         
-    def place_agent(self,state):
+    def place_agent(self):
         while True:
             i=random.randint(0,15)
             j=random.randint(0,15)
             
             # If there is a free space, place the agent
-            if state[i][j]==0:
-                state[i][j]=2
-                return state
+            if self.state[i][j]==0:
+                self.state[i][j]=2
+                return self.state
             
-    def place_goal(self,state):
+    def place_goal(self):
         while True:
             i=random.randint(0,15)
             j=random.randint(0,15)
             
             # If there is a free space, place the goal
-            if state[i][j]==0:
-                state[i][j]=3
-                return state
+            if self.state[i][j]==0:
+                self.state[i][j]=3
+                return self.state
  
     def M_distance(self,position1,position2):
         return abs(position1[0]-position2[0])+abs(position1[1]-position2[1])
     
-    def place_agent_and_goal(self,state,min_dist=17,max_dist=20):  
+    def place_agent_and_goal(self,min_dist=17,max_dist=20):  
         # Save original state
-        original_state=state
-        i=0
+        original_state=self.state
 
         while True:
             # Reset the state on each loop
-            state=copy.deepcopy(original_state)
-            i+=1
-            print(i)
+            self.state=copy.deepcopy(original_state)
             
             # First place the agent
-            state=self.place_agent(state)
-            agent_position=self.find_positions(state,True)
+            self.place_agent()
+            agent_position=self.find_positions(True)
             
             # Place goal
-            state=self.place_goal(state)
-            goal_position=self.find_positions(state,True,True)
-            
-            # self.visualize(state)
+            self.place_goal()
+            goal_position=self.find_positions(True,True)
             
             # Check if Manhattan distance between them is far enough
             if min_dist<self.M_distance(agent_position,goal_position)<max_dist:
-                return state
+                return self.state
             
 environment=Environment()
