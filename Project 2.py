@@ -13,6 +13,9 @@ import random
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 import time
+import warnings
+
+warnings.filterwarnings("ignore", category=UserWarning)
 
 #Example data
 initial_state = [
@@ -33,43 +36,353 @@ initial_state = [
 # initial_state=np.array(initial_state)     #leads to an error
 
 class Agent:
-    def __init__(self,name,initial_state,percept):
-        #Send initial state to Environment class
+    def __init__(self,name,initial_state,percept,Environment):        
+        # Initiate variables
         self.name=name
-        self.data=pd.DataFrame(columns=["Initial state","Belief state","Percept","Goal"])
+        self.initial_state=initial_state
+        self.state=copy.deepcopy(self.initial_state)
+        self.enviro=Environment
         
-        self.data["Initial state"]=initial_state
-        self.data["Belief state"]=initial_state
-        self.data["Percept"]=percept
-        self.data["Goal"]=None
+        # Place mini-agents at possible places
+        self.place_agents(percept)
         
-        percept=self.scan()
+        # Place data for first index
+        self.save_data()
+        
+        self.visualize()
+        
+        # Run the Agent until it finds the goal
+        i=0
+        while i<10:
+            i+=1
+            self.run()
+        
+        # Testing
+        # print(self.scan())
+        # sys.exit()
+        # print(self.enviro.percept())
+        # print(self.data)
+        
+        # Run Agent
+        # while True:
+        #     self.run()
+        
+    def run(self):
+        # Check if at goal
+        if self.enviro.goal_test():
+            print("Goal was found")
+            return None
+        
+        # Get percept from Environment
+        percept=self.enviro.percept()
+        
+        # Update belief state with percept to remove old false mini-agents
         self.update(percept)
-    def scan(self):     #scans N, E, W, and S. But, we already have the belief state with the info
-        belief_state=self.data["Belief state"]  
-        #scans N, E, W, and S
-        percept="0101"  #same percept for each "sub"-agent
         
-        return percept
-    
+        # Choose a move
+        self.choose_action()
+        
+        # Save the data
+        self.save_data()
+        
+        # Officially move the Agent
+        self.move()
+        
+        # Show new state of Agent
+        self.visualize()
+        
+    def place_agents(self,percept):
+        # If two possible square are next to each other, then a previous mini-agent would make one square invalid
+        
+        # original_percept=percept
+        # percepts=[percept]
+        # for i in range(4):
+        #     # Reset percept
+        #     percept=original_percept
+            
+        #     # Change out 0 for 2 in first slot
+        #     if percept[0]=="0":
+        #         percept="2"+percept[0:]
+        #         percepts.append(percept)
+        #         for j in range(3):
+        #             for k in range(2):
+        #                 for l in range(1):
+        #                     print(i,j,k,l)
+        # for i in range(4):
+        #     for j in range(4):
+        
+        for i in range(len(self.initial_state)):
+            for j in range(len(self.initial_state[0])):
+                if percept==self.scan([i,j]).replace("2","0") and self.state[i][j]==0:    #Need scan
+                    print(self.scan([i,j]))
+                    self.state[i][j]=2
+                        
+                    
+    def save_data(self):
+        # Check if self.data exists
+        if not "data" in dir(self):
+            self.data=pd.DataFrame(data={"Belief state":[self.state],
+                              "Positions":[ self.find_positions()],
+                              "Percept":self.enviro.percept(),
+                              "Move":None},index=[0],)
+            return self.data
+        
+        # If it exists, then add on new data
+        new_data=pd.DataFrame(data={"Belief state":[self.state],
+                          "Positions":[self.find_positions()],
+                          "Percept":self.enviro.percept(),
+                          "Move":self.action},index=[0])
+
+        self.data=pd.concat([self.data,new_data],ignore_index=True)    
+        return self.data
+                
+    def scan(self,position=None):  #percept to give to agent #Might use just to initialize the agent
+        # If position=None, find first mini agent
+        if position==None:
+            positions=self.find_positions(True)     #Need find_positons
+        
+        # Initialize percept
+        percept=""
+        
+        #Calculate N, E, W, and S
+        
+        #N
+        try:
+            if position[0]!=0:
+                percept+=str(self.state[position[0]-1][position[1]])
+            else:
+                percept+="1"
+        except IndexError:
+            percept+="1"
+        #E
+        try:
+            if position[1]!=len(self.state[0]):
+                percept+=str(self.state[position[0]][position[1]+1])
+            else:
+                percept+="1"
+        except IndexError:
+            percept+="1"
+        #W
+        try:
+            if position[1]!=0:
+                percept+=str(self.state[position[0]][position[1]-1])
+            else:
+                percept+="1"
+        except IndexError:
+            percept+="1"
+        #S
+        try:
+            if position[0]!=len(self.state):
+                percept+=str(self.state[position[0]+1][position[1]])
+            else:
+                percept+="1"
+        except IndexError:
+            percept+="1"
+        
+        # print(percept)
+        
+        return percept    
+
+    def find_positions(self,first=False):
+        positions=[]
+        
+        # Cycle through matrix
+        for i in range(len(self.state)):
+            for j in range(len(self.state[0])):
+                if self.state[i][j]==2:
+                    positions.append([i,j])
+                    
+                # If first is True, find the first instantce of mini agent
+                if self.state[i][j]==2 and first==True:
+                    return [i,j]
+        
+        return positions
+        
     def predict(self):
         return 
     
-    def update(self,percept):   #percept given by itself or class Environment
-        #code that updates belief state from the percept
+    def update(self,percept):
+        # If the position is not the same as the percept, then remove mini-agent
+        for position in self.find_positions():
+            if self.scan(position).replace("2","0")!=percept:
+                self.state[position[0]][position[1]]=0
+                
+        return None
+    
+    def move(self):
+        # Move each mini-agent to the choosen direction
+        
+        for position in self.find_positions():
+            
+            moved=False
+            
+            # Get position of Agent
+            i=position[0]
+            j=position[1]
+            
+            # If action is North, verify with transition model
+            if self.action=="N" and self.transition_model("N",position):
+                
+                # Place Agent one step North
+                self.state[i-1][j]=2
+                
+                # Say Agent moved
+                moved=True
+                
+            # If action is East
+            if self.action=="E" and self.transition_model("E",position):
+                self.state[i][j+1]=2
+                moved=True
+                
+            # If action is West
+            if self.action=="W" and self.transition_model("W",position):
+                self.state[i][j-1]=2
+                moved=True
+    
+            # If action is South
+            if self.action=="S" and self.transition_model("S",position):
+                self.state[i+1][j]=2
+                moved=True
+                
+            # Set old position as 0 as if Agent moved
+            if moved and not self.if_followed(position): # Problem
+                self.state[i][j]=0  
+            
+        # Officially update the Environment state
+        self.enviro.update(self.action)
+            
+        return None
+    
+    def if_followed(self,position):
+        
+        i=position[0]
+        j=position[1]
+        
+        percept=self.scan(position)
+        
+        # If N, check one step behind S
+        if self.action=="N":
+            if percept[3]=="2":
+                return True
+            else:
+                return False
+            
+        # If E  
+        if self.action=="E":
+            if percept[2]=="2":
+                return True
+            else:
+                return False
+            
+        # If W    
+        if self.action=="W":
+            if percept[1]=="2":
+                return True
+            else:
+                return False
+            
+        # If S    
+        if self.action=="S":
+            if percept[0]=="2":
+                return True
+            else:
+                return False
+        
+    def cost(self,action,position):
+        #each step is one point
+        return random.randint(0,10)
         pass
     
-    def move(self,action):
-        belief_state=self.data["Belief state"]  #grab data when needed using DataFrame
-        Environment.update(action)
+    def transition_model(self,action,position):
+        # Find percept
+        percept=self.scan(position)
+
+        # If North
+        if action=="N":
+            # Check for a wall
+            if percept[0] in "1":
+                # False if there's a wall
+                return False
+            else:
+                return True
+                
+        # If East
+        if action=="E":
+            if percept[1] in "1":
+                return False
+            else:
+                return True
+                
+        # If West
+        if action=="W":
+            if percept[2] in "1":
+                return False
+            else:
+                return True
+                
+        # if South
+        if action=="S":
+            if percept[3] in "1":
+                return False
+            else:
+                return True
+    
+    def choose_action(self):
+        # Initiate costs of all mini-agents
+        costs=[]
         
-    def cost(self):
-        #each step is one point
-        pass
-    def goal_test(self):
-        pass
-    def transition_model(self):     #What's the difference between update and transition model? I think we use transition model to verify update. Removes postion that does not make sense.
-        pass
+        # For every position
+        for position in self.find_positions():
+            # Initiate cost of specific mini-agent
+            mini_agent_costs=[]           
+            
+            # For every action
+            for action in ["N","E","W","S"]:
+                # If direction is possible, find cost of being at that new position
+                if self.transition_model(action, position):
+                   mini_agent_costs.append(self.cost(action,[position[0],position[1]]))
+                else:
+                    # Give high cost if it's not possible
+                    mini_agent_costs.append(100)
+                
+            # After append to costs
+            costs.append(mini_agent_costs)
+         
+        # print(costs)
+        # Return the direction that gives the lowest cost
+        
+        # Initiate final costs to find direction from
+        final_costs=[]
+        
+        for i in range(4):
+            c=0
+            
+            # Add up the costs for each direction
+            for mini_agent_costs in costs:
+                c+=mini_agent_costs[i]
+            
+            final_costs.append(c)
+        
+        # Translate index to direction
+        # print(final_costs)
+        # print(["N","E","W","S"][final_costs.index(min(final_costs))])
+        self.action=["N","E","W","S"][final_costs.index(min(final_costs))]
+        return ["N","E","W","S"][final_costs.index(min(final_costs))]
+    
+    def visualize(self):
+        # Custom color map
+        cmap=ListedColormap(["#ffffff","#666666","#3d85c6","#fbbc04"])
+        
+        # Create plot
+        fig,ax=plt.subplots()
+        ax.matshow(self.state,cmap=cmap)
+        ax.axis("off")
+        
+        # Show plot
+        fig.show()
+        
+        return None
+        
     
 class Environment:
     def __init__(self,initial_state=None,agent_name="Pathfinder",difficulty="M"):
@@ -118,15 +431,7 @@ class Environment:
         percept=self.percept(position)
         
         # Create Agent, and give data (state and percept)
-        self.Agent=Agent(self.agent_name,initial_state_clueless,percept)
-        
-        print(self.Agent.data)
-
-        #Save data in DataFrame
-        # self.data=pd.DataFrame(columns=["Initial state","State","Percept"])
-        # self.data["Initial state"]=initial_state
-        # self.data["State"]=initial_state
-        # self.data["Percept"]=percept
+        self.Agent=Agent(self.agent_name,initial_state_clueless,percept,self)
         
     def generate(self):
         # Create 16x16 state with just walls
@@ -378,7 +683,7 @@ class Environment:
         try:
             if position[0]!=0:
                 percept+=str(self.state[position[0]-1][position[1]])
-            else:
+            else: 
                 percept+="1"
         except IndexError:
             percept+="1"
@@ -450,6 +755,7 @@ class Environment:
         if self.goal_test():
             print("The Agent has reached the goal!")
         
+        # self.visualize()
         return self.state
     
     def find_positions(self,first=False,find_goal=False):
@@ -587,3 +893,4 @@ class Environment:
                 return self.state
             
 environment=Environment()
+data=environment.Agent.data
