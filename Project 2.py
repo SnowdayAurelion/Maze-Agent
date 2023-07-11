@@ -42,9 +42,11 @@ class Agent:
         self.initial_state=initial_state
         self.state=copy.deepcopy(self.initial_state)
         self.enviro=Environment
+        # Save positions of all the mini-agents (avoids rescanning)
+        self.positions=[]
         
         # Place mini-agents at possible places
-        self.place_agents(percept)
+        self.place_agents(percept,True)
         
         # Place data for first index
         self.save_data()
@@ -91,45 +93,34 @@ class Agent:
         # Show new state of Agent
         self.visualize()
         
-    def place_agents(self,percept):
-        # If two possible square are next to each other, then a previous mini-agent would make one square invalid
+    def place_agents(self,percept=None,place_positions=False):
+        # Find positions with same percept as given
+        if percept!=None:
+            for i in range(len(self.initial_state)):
+                for j in range(len(self.initial_state[0])):
+                    if percept==self.scan([i,j]).replace("2","0") and self.state[i][j]==0:
+                        self.positions.append([i,j])
         
-        # original_percept=percept
-        # percepts=[percept]
-        # for i in range(4):
-        #     # Reset percept
-        #     percept=original_percept
-            
-        #     # Change out 0 for 2 in first slot
-        #     if percept[0]=="0":
-        #         percept="2"+percept[0:]
-        #         percepts.append(percept)
-        #         for j in range(3):
-        #             for k in range(2):
-        #                 for l in range(1):
-        #                     print(i,j,k,l)
-        # for i in range(4):
-        #     for j in range(4):
+        # Reset state
+        self.state=copy.deepcopy(self.initial_state)
         
-        for i in range(len(self.initial_state)):
-            for j in range(len(self.initial_state[0])):
-                if percept==self.scan([i,j]).replace("2","0") and self.state[i][j]==0:    #Need scan
-                    print(self.scan([i,j]))
-                    self.state[i][j]=2
-                        
+        # Place positions from self.positions
+        if place_positions:
+            for position in self.positions:
+                self.state[position[0]][position[1]]=2
                     
     def save_data(self):
         # Check if self.data exists
         if not "data" in dir(self):
             self.data=pd.DataFrame(data={"Belief state":[self.state],
-                              "Positions":[ self.find_positions()],
+                              "Positions":[self.positions],
                               "Percept":self.enviro.percept(),
                               "Move":None},index=[0],)
             return self.data
         
         # If it exists, then add on new data
         new_data=pd.DataFrame(data={"Belief state":[self.state],
-                          "Positions":[self.find_positions()],
+                          "Positions":[self.positions],
                           "Percept":self.enviro.percept(),
                           "Move":self.action},index=[0])
 
@@ -203,18 +194,18 @@ class Agent:
     
     def update(self,percept):
         # If the position is not the same as the percept, then remove mini-agent
-        for position in self.find_positions():
+        for position in self.positions:
             if self.scan(position).replace("2","0")!=percept:
-                self.state[position[0]][position[1]]=0
+                self.positions.remove(position)
                 
         return None
     
     def move(self):
-        # Move each mini-agent to the choosen direction
+        # Initiate new positions to replace self.positions
+        new_positions=[]
         
-        for position in self.find_positions():
-            
-            moved=False
+        # Move each mini-agent to the choosen direction
+        for position in self.positions:
             
             # Get position of Agent
             i=position[0]
@@ -224,74 +215,34 @@ class Agent:
             if self.action=="N" and self.transition_model("N",position):
                 
                 # Place Agent one step North
-                self.state[i-1][j]=2
-                
-                # Say Agent moved
-                moved=True
+                new_positions.append([i-1,j])
                 
             # If action is East
             if self.action=="E" and self.transition_model("E",position):
-                self.state[i][j+1]=2
-                moved=True
+                new_positions.append([i,j+1])
                 
             # If action is West
             if self.action=="W" and self.transition_model("W",position):
-                self.state[i][j-1]=2
-                moved=True
+                new_positions.append([i,j-1])
     
             # If action is South
             if self.action=="S" and self.transition_model("S",position):
-                self.state[i+1][j]=2
-                moved=True
-                
-            # Set old position as 0 as if Agent moved
-            if moved and not self.if_followed(position): # Problem
-                self.state[i][j]=0  
-            
+                new_positions.append([i+1,j])
+
+        # Update self.positions
+        self.positions=new_positions
+        
+        # Place new mini-agents
+        self.place_agents(place_positions=True)
+        
         # Officially update the Environment state
         self.enviro.update(self.action)
             
         return None
-    
-    def if_followed(self,position):
-        
-        i=position[0]
-        j=position[1]
-        
-        percept=self.scan(position)
-        
-        # If N, check one step behind S
-        if self.action=="N":
-            if percept[3]=="2":
-                return True
-            else:
-                return False
-            
-        # If E  
-        if self.action=="E":
-            if percept[2]=="2":
-                return True
-            else:
-                return False
-            
-        # If W    
-        if self.action=="W":
-            if percept[1]=="2":
-                return True
-            else:
-                return False
-            
-        # If S    
-        if self.action=="S":
-            if percept[0]=="2":
-                return True
-            else:
-                return False
         
     def cost(self,action,position):
         #each step is one point
         return random.randint(0,10)
-        pass
     
     def transition_model(self,action,position):
         # Find percept
