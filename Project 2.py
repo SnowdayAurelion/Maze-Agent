@@ -36,12 +36,13 @@ initial_state = [
 # initial_state=np.array(initial_state)     #leads to an error
 
 class Agent:
-    def __init__(self,name,initial_state,percept,Environment):        
+    def __init__(self,name,initial_state,percept,Environment,goal=None):        
         # Initiate variables
         self.name=name
         self.initial_state=initial_state
         self.state=copy.deepcopy(self.initial_state)
         self.enviro=Environment
+        self.goal=goal
         # Save positions of all the mini-agents (avoids rescanning)
         self.positions=[]
         
@@ -55,19 +56,27 @@ class Agent:
         
         # Run the Agent until it finds the goal
         i=0
-        while i<10:
+        while i<100:
             i+=1
             self.run()
+            
+            # Stopping code when there's one position or performance test
+            if len(self.positions)==1:
+                break
+        
         
         # Testing
         # print(self.scan())
         # sys.exit()
         # print(self.enviro.percept())
         # print(self.data)
+        # self.data.to_hdf("Project 2 Data.h4", "key")
+        # print(self.action_to_percept(self.data["Positions"].iloc[-1][0], "N"))
         
         # Run Agent
         # while True:
         #     self.run()
+        
         
     def run(self):
         # Check if at goal
@@ -89,6 +98,9 @@ class Agent:
         
         # Officially move the Agent
         self.move()
+        
+        # Testing
+        # print(self.possible_actions())
         
         # Show new state of Agent
         self.visualize()
@@ -279,6 +291,18 @@ class Agent:
                 return True
     
     def choose_action(self):
+        
+        # Eliminate mini-agents until there's one
+        # if len(self.positions)!=1:
+        if True:
+            # print("Length of positions",len(self.positions))
+            self.action=self.single_out_agent()
+            return self.action
+        
+        print("No longer using single out")
+        print("Positions",self.positions)
+        sys.exit()
+        
         # Initiate costs of all mini-agents
         costs=[]
         
@@ -333,7 +357,173 @@ class Agent:
         fig.show()
         
         return None
+    
+    ## AI section
+    
+    def single_out_agent(self):
+        # Find first
         
+        # positions=self.data["Positions"].iloc[-1]
+        positions=self.positions
+        
+        # Scan mini agents' positions
+        for position in positions:
+            # Find possible actions for percept and current position
+            possible_actions_percept=set(self.possible_actions())
+            possible_actions_position=set(self.possible_actions(position))
+            
+            # Make sure the possible actions for position intersects with possible actions for percept
+            if possible_actions_percept & possible_actions_position:
+                
+                # Possible actions are their intersection
+                possible_actions=possible_actions_percept.intersection(possible_actions_position)
+                
+                # For every possible action
+                for action in possible_actions:
+                    # Find the new percept in that direction
+                    moved_percept=self.action_to_percept(action,position).replace("2","0")
+                    
+                    # Check if the moved_percept is unique in the previous history of percepts
+                    if moved_percept not in set(self.data["Percept"]):
+                        # if moved_percept in percept:
+                        print(possible_actions_percept,possible_actions_position,position)
+                        print(moved_percept,set(self.data["Percept"]))
+                        print(action,"\n")
+                        return action
+                    
+                    # for i,percept in enumerate(self.data["Percept"]):
+                    #     if moved_percept not in self.data["Percept"][:i]:
+                    #         print(possible_actions_percept,possible_actions_position)
+                    #         print(moved_percept,self.data["Percept"][:i])
+                    #         return action
+
+        # If it ran out of options, go a random possible direction
+        possible_actions=set(self.possible_actions())
+        # If it's not stuck in a corner, don't go back where it came from
+        if len(possible_actions)>1:
+            # print("Don't go back",possible_actions,self.reverse_action(self.data["Move"].iloc[-1]))
+            possible_actions.remove(self.reverse_action(self.data["Move"].iloc[-1]))
+            
+            ## Choose option closest to the goal
+            # Find mini-agents with same same possible moves
+            positions_hcost={}
+            for position in self.positions:
+                if possible_actions & set(self.possible_actions(position)):
+            
+                    # Find possible positions' h cost for each action
+                    for action in possible_actions:
+                        if action not in positions_hcost.keys():
+                            positions_hcost[action]=self.enviro.M_distance(self.action_to_position(action, position), self.goal)
+                        else:
+                            positions_hcost[action]+=self.enviro.M_distance(self.action_to_position(action, position), self.goal)
+            
+            # Choose action with lowest cost
+            print("positions_hcost",positions_hcost)
+            print(possible_actions)
+            lowest_cost=min(positions_hcost.values())
+            for key,value in positions_hcost.items():
+                if lowest_cost==value:
+                    action=key
+            
+            # action=positions_hcost[positions_hcost.values().index(min(positions_hcost.values()))]
+            print(action)
+            return action
+            
+
+            # possible_positions
+            # h_costs={}
+            # if
+            
+        print(possible_actions_percept,possible_actions_position)
+        print("Stuck in corner",self.possible_actions())
+        action=random.choice(tuple(possible_actions))
+        print(action,"\n")
+        return action
+    
+    def action_to_percept(self,action,position):
+        # Based on action, update position
+        i=position[0]
+        j=position[1]
+        
+        if action=="N":
+            i+=-1
+        elif action=="E":
+            j+=1
+        elif action=="W":
+            j+=-1
+        elif action=="S":
+            i+=1
+        
+        # Find percept of new position
+        return self.scan([i,j])
+    
+    def action_to_position(self,action,position):
+        i=position[0]
+        j=position[1]
+        
+        if action=="N":
+            i+=-1
+        elif action=="E":
+            j+=1
+        elif action=="W":
+            j+=-1
+        elif action=="S":
+            i+=1
+            
+        # Return new position
+        return [i,j]
+    
+    def possible_actions(self,position=None):
+        # Initiate list
+        possible_actions=[]
+        
+        # If the position is given, find the percept. Else assume it's the most recent percept
+        if position!=None:
+            percept=self.scan(position).replace("2","0")
+        else:
+            percept=self.enviro.percept()
+        
+        # Find open squares
+        for i,number in enumerate(percept):
+            if number=="0" or number=="3":
+                # N
+                if i==0:
+                    possible_actions.append("N")
+                
+                # E
+                if i==1:
+                    possible_actions.append("E")
+                
+                # W
+                if i==2:
+                    possible_actions.append("W")
+                
+                # S
+                if i==3:
+                    possible_actions.append("S")
+        
+        return possible_actions
+    
+    def reverse_action(self,action):
+        if action=="N":
+            return "S"
+        if action=="E":
+            return "W"
+        if action=="W":
+            return "E"
+        if action=="S":
+            return "N"
+    
+    # def performance_test(self):
+    #     # This function will end the code once there is a single mini agent and
+    #     # then export to a .txt file amount of moves. The values in the .txt
+    #     # file then can be averaged.
+    #     # print(len(self.positions),self.positions)
+    #     if len(self.positions)==1:
+    #         with open("Moves until single mini-agent.txt","a") as file:
+    #             file.write(str(len(self.data)-1)+"\n")
+    #             print("performance_test: single mini-agent detected, saving # of moves in .txt")
+    #             return True
     
 class Environment:
     def __init__(self,initial_state=None,agent_name="Pathfinder",difficulty="M"):
@@ -382,7 +572,7 @@ class Environment:
         percept=self.percept(position)
         
         # Create Agent, and give data (state and percept)
-        self.Agent=Agent(self.agent_name,initial_state_clueless,percept,self)
+        self.Agent=Agent(self.agent_name,initial_state_clueless,percept,self,self.goal)
         
     def generate(self):
         # Create 16x16 state with just walls
@@ -843,5 +1033,33 @@ class Environment:
             if min_dist<self.M_distance(agent_position,goal_position)<max_dist:
                 return self.state
             
-environment=Environment()
-data=environment.Agent.data
+class Performance_Test:
+    def __init__(self,iterations):
+        self.result=[]
+        self.i=iterations
+        
+        self.run()
+        
+    def run(self):
+        i=0
+        while i<self.i:
+            i+=1
+            
+            # Call onto the class
+            envir=Environment()
+            
+            # Once the Agent is done running in the Environment class, get data
+            self.result.append(len(envir.Agent.data)-1)
+            
+        # Give result to user
+        self.calculate()
+    
+    def calculate(self):
+        print("The average moves after {} iterations is:\n{}".format(self.i,np.average(self.result)))
+        print("Moves",self.result)
+
+Performance_Test(100)
+
+# environment=Environment()
+# data=environment.Agent.data
+
