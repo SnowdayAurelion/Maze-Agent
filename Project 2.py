@@ -43,6 +43,9 @@ class Agent:
         self.state=copy.deepcopy(self.initial_state)
         self.enviro=Environment
         self.goal=goal
+        self.dead_ends=[]
+        self.total_cost=0
+        
         # Save positions of all the mini-agents (avoids rescanning)
         self.positions=[]
         
@@ -64,7 +67,6 @@ class Agent:
             if len(self.positions)==1:
                 break
         
-        
         # Testing
         # print(self.scan())
         # sys.exit()
@@ -84,6 +86,9 @@ class Agent:
             print("Goal was found")
             return None
         
+        # Check for dead ends
+        self.dead_ends_check()
+        
         # Get percept from Environment
         percept=self.enviro.percept()
         
@@ -93,14 +98,17 @@ class Agent:
         # Choose a move
         self.choose_action()
         
+        # Add cost for moving
+        self.total_cost+=1
+        
         # Save the data
         self.save_data()
         
         # Officially move the Agent
         self.move()
         
-        # Testing
-        # print(self.possible_actions())
+        # Place walls at dead ends
+        self.place_dead_ends()
         
         # Show new state of Agent
         self.visualize()
@@ -127,14 +135,16 @@ class Agent:
             self.data=pd.DataFrame(data={"Belief state":[self.state],
                               "Positions":[self.positions],
                               "Percept":self.enviro.percept(),
-                              "Move":None},index=[0],)
+                              "Move":None,
+                              "Cost":self.total_cost},index=[0],)
             return self.data
         
         # If it exists, then add on new data
         new_data=pd.DataFrame(data={"Belief state":[self.state],
                           "Positions":[self.positions],
                           "Percept":self.enviro.percept(),
-                          "Move":self.action},index=[0])
+                          "Move":self.action,
+                          "Cost":self.total_cost},index=[0])
 
         self.data=pd.concat([self.data,new_data],ignore_index=True)    
         return self.data
@@ -247,13 +257,20 @@ class Agent:
         # Place new mini-agents
         self.place_agents(place_positions=True)
         
+
+        
         # Officially update the Environment state
         self.enviro.update(self.action)
             
         return None
         
-    def cost(self,action,position):
-        #each step is one point
+    def cost(self,position=None):
+        if position:
+            # Calculate g+h
+            return self.cost()+self.envir.M_distance(self.positions[0],position)
+        
+        
+        
         return random.randint(0,10)
     
     def transition_model(self,action,position):
@@ -297,6 +314,7 @@ class Agent:
         if True:
             # print("Length of positions",len(self.positions))
             self.action=self.single_out_agent()
+            
             return self.action
         
         print("No longer using single out")
@@ -345,12 +363,23 @@ class Agent:
         return ["N","E","W","S"][final_costs.index(min(final_costs))]
     
     def visualize(self):
+        
+        state=copy.deepcopy(self.state)
+        
         # Custom color map
         cmap=ListedColormap(["#ffffff","#666666","#3d85c6","#fbbc04"])
         
+        # For dead ends
+        if self.dead_ends:
+            cmap=ListedColormap(["#ffffff","#666666","#3d85c6","#fbbc04","#ff6d01"])
+            
+            # Replace all dead end positions with 4
+            for position in self.dead_ends:
+                state[position[0]][position[1]]=4
+        
         # Create plot
         fig,ax=plt.subplots()
-        ax.matshow(self.state,cmap=cmap)
+        ax.matshow(state,cmap=cmap)
         ax.axis("off")
         
         # Show plot
@@ -362,15 +391,57 @@ class Agent:
     
     def single_out_agent(self):
         # Find first
-        
         # positions=self.data["Positions"].iloc[-1]
         positions=self.positions
         
+        
+        # Choose action that leads to unique percept
         # Scan mini agents' positions
         for position in positions:
             # Find possible actions for percept and current position
             possible_actions_percept=set(self.possible_actions())
             possible_actions_position=set(self.possible_actions(position))
+            
+            # # Rechecking all positions to remove an action that leads to a dead end
+            # for position in positions:
+            #     # Positions with same percept as real agent
+            #     if self.scan(position).replace("2","0")==self.enviro.percept:
+            #         # For each possible action from real agent
+            #         for action in possible_actions_percept:
+            #             # Find ones that lead to dead end
+            #             if self.action_to_dead_end_check(action, position):
+            #                 # Remove it from possible actions of the real agent
+            #                 possible_actions_percept.remove(action)
+            
+            # If the real agent is next to another agent, separate from each other
+            # for position in positions:
+            #     # If position has a chance to be the real agent
+            #     if self.scan(position).replace("2","0")==self.enviro.percept():
+            #     # And there's another agent next to it
+            #         if "2" in self.scan(position):
+            #             try:
+            #                 print(self.scan(position),self.enviro.percept())
+            #                 # Find direction of where agent is
+            #                 if self.scan(position)[0]=="2":
+            #                     # Remove direction
+            #                     possible_actions_percept.remove("N")
+            #                 if self.scan(position)[1]=="2":
+            #                     possible_actions_percept.remove("E")
+            #                 if self.scan(position)[2]=="2":
+            #                     possible_actions_percept.remove("W")
+            #                 if self.scan(position)[3]=="2":
+            #                     possible_actions_percept.remove("S")
+            #             except KeyError:
+            #                 pass
+            
+            
+            
+            
+            # for action in possible_actions_percept:
+            #     print("Ah",action,possible_actions_percept,position)
+            #     if self.action_to_dead_end_check(action, position):
+            #         print("did something")
+            #         possible_actions_percept.remove(action)
             
             # Make sure the possible actions for position intersects with possible actions for percept
             if possible_actions_percept & possible_actions_position:
@@ -386,7 +457,7 @@ class Agent:
                     # Check if the moved_percept is unique in the previous history of percepts
                     if moved_percept not in set(self.data["Percept"]):
                         # if moved_percept in percept:
-                        print(possible_actions_percept,possible_actions_position,position)
+                        print("single_agent",possible_actions_percept,possible_actions_position,position)
                         print(moved_percept,set(self.data["Percept"]))
                         print(action,"\n")
                         return action
@@ -399,10 +470,14 @@ class Agent:
 
         # If it ran out of options, go a random possible direction
         possible_actions=set(self.possible_actions())
+        # print("\npossible_actions",possible_actions)
+        # print(self.enviro.find_positions(True))
+        # self.enviro.visualize()
+        # sys.exit()
         # If it's not stuck in a corner, don't go back where it came from
         if len(possible_actions)>1:
             # print("Don't go back",possible_actions,self.reverse_action(self.data["Move"].iloc[-1]))
-            possible_actions.remove(self.reverse_action(self.data["Move"].iloc[-1]))
+            # possible_actions.remove(self.reverse_action(self.data["Move"].iloc[-1]))
             
             ## Choose option closest to the goal
             # Find mini-agents with same same possible moves
@@ -417,16 +492,41 @@ class Agent:
                         else:
                             positions_hcost[action]+=self.enviro.M_distance(self.action_to_position(action, position), self.goal)
             
+            # # Check for possability of loop
+            # if len(positions_hcost)==2:
+            #     # If both values are the same
+            #     if list(positions_hcost.values())[0]==list(positions_hcost.values())[1]:
+            #         # If past 4 moves consists of only 2 different direction
+            #         if len(set(self.data["Move"].iloc[-4:]))==2:
+            #             # Make sure dataframe is at least 4 moves long
+            #             if len(self.data)>4:
+            #                 # Make sure it's a loop pattern
+            #                 if self.data["Move"].iloc[-1]==self.data["Move"].iloc[-3] and self.data["Move"].iloc[-2]==self.data["Move"].iloc[-4]:
+            #                     print("Move set",self.data["Move"].iloc[-4:])
+            #                     print("hcost dict",positions_hcost)
+            #                     # Remove the second last move from this option
+            #                     print("Loop detected between moves {} and {}, forbidding {}".format(self.data["Move"].iloc[-1],self.data["Move"].iloc[-2],self.data["Move"].iloc[-2]))
+            #                     del positions_hcost[self.data["Move"].iloc[-2]]
+            
+            # Check for a possability of a loop
+            if self.loop_check():
+                try:
+                    del positions_hcost[self.loop_check()]
+                    print("Loop detected, forbid",self.loop_check())
+                except KeyError:
+                    pass
+                        
+            
             # Choose action with lowest cost
             print("positions_hcost",positions_hcost)
-            print(possible_actions)
+            # print(possible_actions)
             lowest_cost=min(positions_hcost.values())
             for key,value in positions_hcost.items():
                 if lowest_cost==value:
                     action=key
             
             # action=positions_hcost[positions_hcost.values().index(min(positions_hcost.values()))]
-            print(action)
+            print(action,"\n")
             return action
             
 
@@ -434,9 +534,11 @@ class Agent:
             # h_costs={}
             # if
             
-        print(possible_actions_percept,possible_actions_position)
+        # print(possible_actions_percept,possible_actions_position)
         print("Stuck in corner",self.possible_actions())
-        action=random.choice(tuple(possible_actions))
+        # print("Percept",self.enviro.percept())
+        # self.enviro.visualize()
+        # action=self.possible_actions()[0]
         print(action,"\n")
         return action
     
@@ -502,6 +604,7 @@ class Agent:
                 if i==3:
                     possible_actions.append("S")
         
+        
         return possible_actions
     
     def reverse_action(self,action):
@@ -513,6 +616,41 @@ class Agent:
             return "E"
         if action=="S":
             return "N"
+        
+    def dead_ends_check(self):
+        # Check positions that are in a dead end
+        for position in self.positions:
+            if len(self.possible_actions(position))==1 and position!=self.goal:
+                
+                # Make sure there's not another agent next to it
+                if "2" not in self.scan(position):
+                
+                    # Create wall at dead end
+                    print("Dead end at",position)
+                    self.dead_ends.append(position)
+                
+        return None
+    
+    def place_dead_ends(self):
+        # Place orange walls at dead ends
+        for position in self.dead_ends:
+            self.state[position[0]][position[1]]=1
+        
+        # Place orange walls at dead ends in Environment class
+        self.enviro.place_dead_ends(self.dead_ends)
+        
+    def action_to_dead_end_check(self,action,position):
+        if self.action_to_position(action, position) in self.dead_ends:
+            return True
+        else:
+            return False
+        
+    def loop_check(self):
+        for i,positions in enumerate(list(self.data["Positions"])):
+            if self.positions==positions:
+                # print("Loop detected, forbid move",self.data["Move"].iloc[i])
+                return self.data["Move"].iloc[i]
+        return None
     
     # def performance_test(self):
     #     # This function will end the code once there is a single mini agent and
@@ -526,7 +664,7 @@ class Agent:
     #             return True
     
 class Environment:
-    def __init__(self,initial_state=None,agent_name="Pathfinder",difficulty="M"):
+    def __init__(self,initial_state=None,agent_name="Pathfinder",difficulty="M",seed=None):
         # Initiate variables
         self.agent_name=agent_name
         self.state=initial_state
@@ -534,7 +672,7 @@ class Environment:
 
         # Generate initial state if not given
         if self.state==None:
-            self.generate()
+            self.generate(seed)
         
         # Set difficulty parameters
         
@@ -554,7 +692,8 @@ class Environment:
             max_dist=31
         
         # Place Agent and Goal in map
-        self.place_agent_and_goal(min_dist,max_dist)
+        self.place_agent_and_goal(min_dist,max_dist,seed)
+        print("Seed\n",self.seed,"\n-------------\n")
         self.visualize()    
         
         # Find positon of Agent and Goal
@@ -573,13 +712,17 @@ class Environment:
         
         # Create Agent, and give data (state and percept)
         self.Agent=Agent(self.agent_name,initial_state_clueless,percept,self,self.goal)
-        
-    def generate(self):
+        self.visualize()
+        print("-------------\n","Seed\n ",self.seed)
+    def generate(self,seed=None):
         # Create 16x16 state with just walls
         state=[[0 for i in range(16)] for i in range(16)]
         
+        # Prepare seed creation
+        self.seed=""
+        
         # Create functions that chooses the piece variation
-        def choose_piece1():
+        def choose_piece1(choose_index=None):
             
             options = [[[0, 1, 0, 0, 0, 1, 0, 0],
                        [0, 1, 1, 1, 0, 1, 1, 0],
@@ -626,9 +769,17 @@ class Environment:
                         [0, 1, 1, 1, 1, 1, 0, 1],
                         [0, 0, 0, 0, 1, 1, 0, 0]]]
             
-            return options[random.randint(0,len(options)-1)]
+            
+            index=random.randint(0,len(options)-1)
+            
+            # If index is choosen
+            if choose_index:
+                index=int(choose_index)
+                
+            self.seed+=str(index)
+            return options[index]
         
-        def choose_piece2():
+        def choose_piece2(choose_index=None):
             
             options = [[[1, 0, 1, 1, 1, 1, 1, 1],
                        [1, 0, 0, 0, 0, 0, 1, 1],
@@ -675,9 +826,16 @@ class Environment:
                         [1, 0, 0, 1, 0, 1, 0, 1],
                         [1, 1, 1, 1, 0, 1, 1, 1]]]
             
-            return options[random.randint(0,len(options)-1)]
+            index=random.randint(0,len(options)-1)
+            
+            # If index is choosen
+            if choose_index:
+                index=int(choose_index)
+                
+            self.seed+=str(index)
+            return options[index]
         
-        def choose_piece3():
+        def choose_piece3(choose_index=None):
             
             options = [[[1, 1, 1, 0, 1, 1, 1, 1],
                        [0, 0, 0, 0, 0, 0, 0, 1],
@@ -724,9 +882,16 @@ class Environment:
                         [0, 0, 0, 1, 0, 0, 0, 1],
                         [1, 0, 1, 1, 1, 0, 1, 1]]]
 
-            return options[random.randint(0,len(options)-1)]
+            index=random.randint(0,len(options)-1)
+            
+            # If index is choosen
+            if choose_index:
+                index=int(choose_index)
+                
+            self.seed+=str(index)
+            return options[index]
     
-        def choose_piece4():
+        def choose_piece4(choose_index=None):
             
             options = [[[1, 0, 0, 0, 0, 1, 1, 1],
                        [1, 0, 1, 1, 0, 0, 0, 1],
@@ -773,11 +938,22 @@ class Environment:
                         [1, 0, 0, 1, 0, 1, 0, 1],
                         [1, 0, 1, 1, 0, 0, 0, 1]]]
             
-            return options[random.randint(0,len(options)-1)]
+            index=random.randint(0,len(options)-1)
+            
+            # If index is choosen
+            if choose_index:
+                index=int(choose_index)
+                
+            self.seed+=str(index)
+            return options[index]
         
         # Dictionary of pieces we are using
-        pieces={1:choose_piece1(),2:choose_piece2(),3:choose_piece3(),4:choose_piece4()}
-        
+        # If a seed is given
+        if seed:
+            pieces={1:choose_piece1(seed[0]),2:choose_piece2(seed[1]),3:choose_piece3(seed[2]),4:choose_piece4(seed[3])}
+        else:
+            pieces={1:choose_piece1(),2:choose_piece2(),3:choose_piece3(),4:choose_piece4()}
+
         # Place pieces in state
         
         ## Intiate pieces
@@ -808,6 +984,11 @@ class Environment:
         
         # print(state)
         self.state=state
+        
+        # Create seed
+        # for piece in pieces.values():
+            
+        
         return self.state
     
     def percept(self,position=None):  #percept to give to agent #Might use just to initialize the agent
@@ -920,12 +1101,24 @@ class Environment:
         return positions
     
     def visualize(self):
+        
+        state=copy.deepcopy(self.state)
+        
         # Custom color map
         cmap=ListedColormap(["#ffffff","#666666","#3d85c6","#fbbc04"])
         
+        # For dead ends (once the Agent class is created)
+        if hasattr(self, 'Agent'):
+            if self.Agent.dead_ends:
+                cmap=ListedColormap(["#ffffff","#666666","#3d85c6","#fbbc04","#ff6d01"])
+                
+                # Replace all dead end positions with 4
+                for position in self.Agent.dead_ends:
+                    state[position[0]][position[1]]=4
+        
         # Create plot
         fig,ax=plt.subplots()
-        ax.matshow(self.state,cmap=cmap)
+        ax.matshow(state,cmap=cmap)
         ax.axis("off")
         
         # Show plot
@@ -990,30 +1183,38 @@ class Environment:
         else:
             return False
         
-    def place_agent(self):
-        while True:
-            i=random.randint(0,15)
-            j=random.randint(0,15)
+    def place_agent(self,position=None):
+        if position:
+            self.state[int(position[0])][int(position[1])]=2
+            return self.state
+        else:
+            while True:
+                i=random.randint(0,15)
+                j=random.randint(0,15)
+                
+                # If there is a free space, place the agent
+                if self.state[i][j]==0:
+                    self.state[i][j]=2
+                    return self.state
             
-            # If there is a free space, place the agent
-            if self.state[i][j]==0:
-                self.state[i][j]=2
-                return self.state
-            
-    def place_goal(self):
-        while True:
-            i=random.randint(0,15)
-            j=random.randint(0,15)
-            
-            # If there is a free space, place the goal
-            if self.state[i][j]==0:
-                self.state[i][j]=3
-                return self.state
+    def place_goal(self,position=None):
+        if position:
+            self.state[int(position[0])][int(position[1])]=3
+            return self.state
+        else:
+            while True:
+                i=random.randint(0,15)
+                j=random.randint(0,15)
+                
+                # If there is a free space, place the goal
+                if self.state[i][j]==0:
+                    self.state[i][j]=3
+                    return self.state
  
     def M_distance(self,position1,position2):
         return abs(position1[0]-position2[0])+abs(position1[1]-position2[1])
     
-    def place_agent_and_goal(self,min_dist=17,max_dist=20):  
+    def place_agent_and_goal(self,min_dist=17,max_dist=20,seed=None):  
         # Save original state
         original_state=self.state
 
@@ -1022,16 +1223,38 @@ class Environment:
             self.state=copy.deepcopy(original_state)
             
             # First place the agent
-            self.place_agent()
-            agent_position=self.find_positions(True)
+            if seed:
+                self.place_agent([seed[4:6],seed[6:8]])
+                agent_position=self.find_positions(True) 
+            else:
+                self.place_agent()
+                agent_position=self.find_positions(True)
             
             # Place goal
-            self.place_goal()
-            goal_position=self.find_positions(True,True)
+            if seed:
+                self.place_goal([seed[8:10],seed[10:12]])
+                goal_position=self.find_positions(True,True)
+                
+                # Add positions to self.seed
+                self.seed+=seed[4:12]
+                
+                return self.state
+            else:
+                self.place_goal()
+                goal_position=self.find_positions(True,True)
             
             # Check if Manhattan distance between them is far enough
             if min_dist<self.M_distance(agent_position,goal_position)<max_dist:
+                
+                # Create seed for position of agent and goal
+                self.seed+=str(agent_position[0]).zfill(2)+str(agent_position[1]).zfill(2)
+                self.seed+=str(goal_position[0]).zfill(2)+str(goal_position[1]).zfill(2)
+                
                 return self.state
+    
+    def place_dead_ends(self,dead_ends):
+        for position in dead_ends:
+            self.state[position[0]][position[1]]=1
             
 class Performance_Test:
     def __init__(self,iterations):
@@ -1044,6 +1267,7 @@ class Performance_Test:
         i=0
         while i<self.i:
             i+=1
+            print("       i",i)
             
             # Call onto the class
             envir=Environment()
@@ -1058,8 +1282,8 @@ class Performance_Test:
         print("The average moves after {} iterations is:\n{}".format(self.i,np.average(self.result)))
         print("Moves",self.result)
 
-Performance_Test(100)
+# Performance_Test(1000)
 
-# environment=Environment()
-# data=environment.Agent.data
+environment=Environment()
+data=environment.Agent.data
 
